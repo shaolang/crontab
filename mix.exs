@@ -23,7 +23,14 @@ defmodule Crontab.Mixfile do
             [plt_file: {:no_warn, "priv/plts/dialyzer.plt"}]
           else
             []
-          end
+          end,
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.cobertura": :test,
+      ]
     ]
   end
 
