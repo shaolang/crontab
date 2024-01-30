@@ -1,5 +1,6 @@
 defmodule Crontab.DateHelper do
   @moduledoc false
+  alias Crontab.DateChecker
 
   @type unit :: :year | :month | :day | :hour | :minute | :second | :microsecond
 
@@ -21,8 +22,11 @@ defmodule Crontab.DateHelper do
       iex> Crontab.DateHelper.beginning_of(~N[2016-03-14 01:45:45.123], :year)
       ~N[2016-01-01 00:00:00]
 
+      iex> Crontab.DateHelper.beginning_of(~U[2016-03-14T01:45:45.123Z], :year)
+      ~U[2016-01-01T00:00:00Z]
+
   """
-  @spec beginning_of(NaiveDateTime.t(), unit) :: NaiveDateTime.t()
+  @spec beginning_of(DateChecker.date(), unit) :: DateChecker.date()
   def beginning_of(date, unit) do
     _beginning_of(date, proceeding_units(unit))
   end
@@ -35,8 +39,10 @@ defmodule Crontab.DateHelper do
       iex> Crontab.DateHelper.end_of(~N[2016-03-14 01:45:45.123], :year)
       ~N[2016-12-31 23:59:59.999999]
 
+      iex> Crontab.DateHelper.end_of(~U[2016-03-14T01:45:45.123Z], :year)
+      ~U[2016-12-31 23:59:59.999999Z]
   """
-  @spec end_of(NaiveDateTime.t(), unit) :: NaiveDateTime.t()
+  @spec end_of(DateChecker.date(), unit) :: DateChecker.date()
   def end_of(date, unit) do
     _end_of(date, proceeding_units(unit))
   end
@@ -44,7 +50,7 @@ defmodule Crontab.DateHelper do
   @doc """
   Find the last occurrence of weekday in month.
   """
-  @spec last_weekday(NaiveDateTime.t(), Calendar.day_of_week()) :: Calendar.day()
+  @spec last_weekday(DateChecker.date(), Calendar.day_of_week()) :: Calendar.day()
   def last_weekday(date, weekday) do
     date
     |> end_of(:month)
@@ -54,7 +60,7 @@ defmodule Crontab.DateHelper do
   @doc """
   Find the nth weekday of month.
   """
-  @spec nth_weekday(NaiveDateTime.t(), Calendar.day_of_week(), integer) :: Calendar.day()
+  @spec nth_weekday(DateChecker.date(), Calendar.day_of_week(), integer) :: Calendar.day()
   def nth_weekday(date, weekday, n) do
     date
     |> beginning_of(:month)
@@ -64,7 +70,7 @@ defmodule Crontab.DateHelper do
   @doc """
   Find the last occurrence of weekday in month.
   """
-  @spec last_weekday_of_month(NaiveDateTime.t()) :: Calendar.day()
+  @spec last_weekday_of_month(DateChecker.date()) :: Calendar.day()
   def last_weekday_of_month(date) do
     last_weekday_of_month(end_of(date, :month), :end)
   end
@@ -72,81 +78,102 @@ defmodule Crontab.DateHelper do
   @doc """
   Find the next occurrence of weekday relative to date.
   """
-  @spec next_weekday_to(NaiveDateTime.t()) :: Calendar.day()
-  def next_weekday_to(date = %NaiveDateTime{year: year, month: month, day: day}) do
+  @spec next_weekday_to(DateChecker.date()) :: Calendar.day()
+  def next_weekday_to(date = %{year: year, month: month, day: day}) do
     weekday = :calendar.day_of_the_week(year, month, day)
-    next_day = NaiveDateTime.add(date, 86_400, :second)
-    previous_day = NaiveDateTime.add(date, -86_400, :second)
+    next_day = mod(date).add(date, 86_400, :second)
+    previous_day = mod(date).add(date, -86_400, :second)
 
     cond do
       weekday == 7 && next_day.month == date.month -> next_day.day
-      weekday == 7 -> NaiveDateTime.add(date, -86_400 * 2, :second).day
+      weekday == 7 -> mod(date).add(date, -86_400 * 2, :second).day
       weekday == 6 && previous_day.month == date.month -> previous_day.day
-      weekday == 6 -> NaiveDateTime.add(date, 86_400 * 2, :second).day
+      weekday == 6 -> mod(date).add(date, 86_400 * 2, :second).day
       true -> date.day
     end
   end
 
-  @spec inc_year(NaiveDateTime.t()) :: NaiveDateTime.t()
+  @spec inc_year(DateChecker.date()) :: DateChecker.date()
   def inc_year(date) do
     leap_year? =
       date
-      |> NaiveDateTime.to_date()
+      |> mod(date).to_date()
       |> Date.leap_year?()
 
     if leap_year? do
-      NaiveDateTime.add(date, 366 * 86_400, :second)
+      mod(date).add(date, 366 * 86_400, :second)
     else
-      NaiveDateTime.add(date, 365 * 86_400, :second)
+      mod(date).add(date, 365 * 86_400, :second)
     end
   end
 
-  @spec dec_year(NaiveDateTime.t()) :: NaiveDateTime.t()
+  @spec dec_year(DateChecker.date()) :: DateChecker.date()
   def dec_year(date) do
     leap_year? =
       date
-      |> NaiveDateTime.to_date()
+      |> mod(date).to_date()
       |> Date.leap_year?()
 
     if leap_year? do
-      NaiveDateTime.add(date, -366 * 86_400, :second)
+      mod(date).add(date, -366 * 86_400, :second)
     else
-      NaiveDateTime.add(date, -365 * 86_400, :second)
+      mod(date).add(date, -365 * 86_400, :second)
     end
   end
 
-  @spec inc_month(NaiveDateTime.t()) :: NaiveDateTime.t()
-  def inc_month(date = %NaiveDateTime{day: day}) do
+  @spec inc_month(DateChecker.date()) :: DateChecker.date()
+  def inc_month(date = %{day: day}) do
     days =
       date
-      |> NaiveDateTime.to_date()
+      |> mod(date).to_date()
       |> Date.days_in_month()
 
-    NaiveDateTime.add(date, (days + 1 - day) * 86_400, :second)
+    mod(date).add(date, (days + 1 - day) * 86_400, :second)
   end
 
-  @spec dec_month(NaiveDateTime.t()) :: NaiveDateTime.t()
+  @spec dec_month(DateChecker.date()) :: DateChecker.date()
   def dec_month(date) do
     days =
       date
-      |> NaiveDateTime.to_date()
+      |> mod(date).to_date()
       |> Date.days_in_month()
 
-    NaiveDateTime.add(date, days * -86_400, :second)
+    mod(date).add(date, days * -86_400, :second)
   end
 
-  @spec _beginning_of(NaiveDateTime.t(), [{unit, {any, any}}]) :: NaiveDateTime.t()
+  @doc """
+  Get the Nth day before the last day of the month.
+
+  ## Examples
+
+      iex> Crontab.DateHelper.nth_day_before_month_end(~N[2016-03-14 01:45:45.123], 5)
+      ~N[2016-03-26 01:45:45.123]
+
+  """
+  @spec nth_day_before_month_end(date :: DateChecker.date(), days_before :: pos_integer()) ::
+          DateChecker.date()
+  def nth_day_before_month_end(datetime, days_before) do
+    mod = mod(datetime)
+
+    datetime
+    |> end_of(:month)
+    |> mod.add(-days_before, :day)
+    |> mod.to_date()
+    |> mod.new!(mod.to_time(datetime))
+  end
+
+  @spec _beginning_of(DateChecker.date(), [{unit, {any, any}}]) :: DateChecker.date()
   defp _beginning_of(date, [{unit, {lower, _}} | tail]) do
     _beginning_of(Map.put(date, unit, lower), tail)
   end
 
   defp _beginning_of(date, []), do: date
 
-  @spec _end_of(NaiveDateTime.t(), [{unit, {any, any}}]) :: NaiveDateTime.t()
+  @spec _end_of(DateChecker.date(), [{unit, {any, any}}]) :: DateChecker.date()
   defp _end_of(date, [{unit, {_, :end_onf_month}} | tail]) do
     upper =
       date
-      |> NaiveDateTime.to_date()
+      |> mod(date).to_date()
       |> Date.days_in_month()
 
     _end_of(Map.put(date, unit, upper), tail)
@@ -178,35 +205,38 @@ defmodule Crontab.DateHelper do
     units
   end
 
-  @spec nth_weekday(NaiveDateTime.t(), Calendar.day_of_week(), :start) :: boolean
-  defp nth_weekday(date = %NaiveDateTime{}, _, 0, :start),
-    do: NaiveDateTime.add(date, -86_400, :second).day
+  @spec nth_weekday(DateChecker.date(), Calendar.day_of_week(), :start) :: boolean
+  defp nth_weekday(date, _, 0, :start),
+    do: mod(date).add(date, -86_400, :second).day
 
-  defp nth_weekday(date = %NaiveDateTime{year: year, month: month, day: day}, weekday, n, :start) do
+  defp nth_weekday(date = %{year: year, month: month, day: day}, weekday, n, :start) do
     if :calendar.day_of_the_week(year, month, day) == weekday do
-      nth_weekday(NaiveDateTime.add(date, 86_400, :second), weekday, n - 1, :start)
+      nth_weekday(mod(date).add(date, 86_400, :second), weekday, n - 1, :start)
     else
-      nth_weekday(NaiveDateTime.add(date, 86_400, :second), weekday, n, :start)
+      nth_weekday(mod(date).add(date, 86_400, :second), weekday, n, :start)
     end
   end
 
-  @spec last_weekday_of_month(NaiveDateTime.t(), :end) :: Calendar.day()
-  defp last_weekday_of_month(date = %NaiveDateTime{year: year, month: month, day: day}, :end) do
+  @spec last_weekday_of_month(DateChecker.date(), :end) :: Calendar.day()
+  defp last_weekday_of_month(date = %{year: year, month: month, day: day}, :end) do
     weekday = :calendar.day_of_the_week(year, month, day)
 
     if weekday > 5 do
-      last_weekday_of_month(NaiveDateTime.add(date, -86_400, :second), :end)
+      last_weekday_of_month(mod(date).add(date, -86_400, :second), :end)
     else
       day
     end
   end
 
-  @spec last_weekday(NaiveDateTime.t(), non_neg_integer, :end) :: Calendar.day()
-  defp last_weekday(date = %NaiveDateTime{year: year, month: month, day: day}, weekday, :end) do
+  @spec last_weekday(DateChecker.date(), non_neg_integer, :end) :: Calendar.day()
+  defp last_weekday(date = %{year: year, month: month, day: day}, weekday, :end) do
     if :calendar.day_of_the_week(year, month, day) == weekday do
       day
     else
-      last_weekday(NaiveDateTime.add(date, -86_400, :second), weekday, :end)
+      last_weekday(mod(date).add(date, -86_400, :second), weekday, :end)
     end
   end
+
+  defp mod(%DateTime{}), do: DateTime
+  defp mod(%NaiveDateTime{}), do: NaiveDateTime
 end
