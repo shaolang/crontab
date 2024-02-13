@@ -44,7 +44,7 @@ defmodule Crontab.Mixfile do
       {:excoveralls, "~> 0.5", only: [:test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:credo, "~> 1.0", only: [:dev], runtime: false},
-      {:nimble_parsec, "~> 0.5"},
+      {:nimble_parsec, "~> 1.4"},
       {:mix_test_watch, "~> 1.1", only: [:dev, :test], runtime: false},
       {:tz, "~> 0.26", only: [:dev, :test]}
     ]
