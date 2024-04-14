@@ -286,10 +286,11 @@ defmodule Crontab.DateHelper do
     end
   end
 
-  @doc false
-  def add(datetime = %NaiveDateTime{}, amt, unit), do: NaiveDateTime.add(datetime, amt, unit)
+  def add(datetime, amt, unit, on_ambiguity \\ :later)
 
-  def add(datetime = %DateTime{}, amt, unit) do
+  def add(datetime = %NaiveDateTime{}, amt, unit, _), do: NaiveDateTime.add(datetime, amt, unit)
+
+  def add(datetime = %DateTime{}, amt, unit, on_ambiguity) do
     candidate = DateTime.add(datetime, amt, unit)
     adjustment = datetime.std_offset - candidate.std_offset
     adjusted = DateTime.add(candidate, adjustment, :second)
@@ -298,9 +299,12 @@ defmodule Crontab.DateHelper do
       candidate
     else
       case DateTime.from_naive(DateTime.to_naive(adjusted), adjusted.time_zone) do
-        {:ambiguous, _, target} -> target
+        {:ambiguous, earlier, later} -> resolve_ambiguity(on_ambiguity, earlier, later)
         {:ok, target} -> target
       end
     end
   end
+
+  def resolve_ambiguity(:later, _, later), do: later
+  def resolve_ambiguity(_, earlier, _), do: earlier
 end

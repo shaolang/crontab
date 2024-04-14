@@ -109,18 +109,58 @@ defmodule Crontab.DateHelperTest do
           {:minute, 1, 0, 59},
           {:hour, 1, 59, 59}
         ] do
-      test "one #{unit} to one second before NY DST ends" do
+      test "one #{unit} to one second before NY DST ends and :on_ambiguity is :later" do
         one_sec_before = DateTime.from_naive!(~N[2024-11-03 00:59:59], "America/New_York")
+        new_time = Time.new!(unquote(hour), unquote(minute), unquote(second))
+        {:ambiguous, _, expected} = DateTime.new(~D[2024-11-03], new_time, "America/New_York")
 
-        # 'cos 1:00:00 to 1:59:00 can be represented as timezones for EDT and EST,
-        # so "work backwards" by getting the EST time from 2:00 onwards then minus 1 hour
-        two_plus = Time.new!(unquote(hour) + 1, unquote(minute), unquote(second))
+        assert DateHelper.add(one_sec_before, 1, unquote(unit), :later) == expected
+      end
+    end
 
-        expected =
-          DateTime.new!(~D[2024-11-03], two_plus, "America/New_York")
-          |> DateTime.add(-1, :hour)
+    for {unit, hour, minute, second, on_ambiguity} <- [
+          {:second, 1, 0, 0, :earlier},
+          {:minute, 1, 0, 59, :earlier},
+          {:hour, 1, 59, 59, :earlier},
+          {:second, 1, 0, 0, :both},
+          {:minute, 1, 0, 59, :both},
+          {:hour, 1, 59, 59, :both}
+        ] do
+      test "one #{unit} to one second before NY DST ends and :on_ambiguity is #{on_ambiguity}" do
+        one_sec_before = DateTime.from_naive!(~N[2024-11-03 00:59:59], "America/New_York")
+        new_time = Time.new!(unquote(hour), unquote(minute), unquote(second))
+        {:ambiguous, expected, _} = DateTime.new(~D[2024-11-03], new_time, "America/New_York")
 
-        assert DateHelper.add(one_sec_before, 1, unquote(unit)) == expected
+        assert DateHelper.add(one_sec_before, 1, unquote(unit), unquote(on_ambiguity)) == expected
+      end
+    end
+
+    test "on_ambiguity == :later and current time is already non daylight saving + 1 sec" do
+      {:ambiguous, _, current_time} =
+        DateTime.from_naive(~N[2024-11-03 01:00:00], "America/New_York")
+
+      {:ambiguous, _, expected} = DateTime.from_naive(~N[2024-11-03 01:00:01], "America/New_York")
+
+      assert DateHelper.add(current_time, 1, :second, :later) == expected
+    end
+
+    test "on_ambiguity == :later and current time is already non daylight saving + 1 hour" do
+      {:ambiguous, _, current_time} =
+        DateTime.from_naive(~N[2024-11-03 01:00:00], "America/New_York")
+
+      expected = DateTime.from_naive!(~N[2024-11-03 02:00:00], "America/New_York")
+
+      assert DateHelper.add(current_time, 1, :hour, :later) == expected
+    end
+
+    for {expected_utc_offset, on_ambiguity} <- [{-4, :earlier}, {-4, :both}, {-5, :later}] do
+      test "on_ambiguity == #{on_ambiguity} and +1 day to 1AM on day before daylight saving ends" do
+        one_day_before = DateTime.from_naive!(~N[2024-11-02 01:00:00], "America/New_York")
+
+        %{hour: 1, utc_offset: utc_offset, std_offset: std_offset} =
+          DateHelper.add(one_day_before, 1, :day, unquote(on_ambiguity))
+
+        assert utc_offset + std_offset == unquote(expected_utc_offset) * 3600
       end
     end
   end
